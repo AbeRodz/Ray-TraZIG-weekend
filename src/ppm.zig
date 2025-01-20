@@ -1,4 +1,6 @@
 const std = @import("std");
+const color = @import("color.zig");
+const vec3 = @import("vec.zig");
 
 pub fn ppmWriter(writer: anytype, width: usize, height: usize) anyerror!void {
     //const width = image.len;
@@ -7,15 +9,8 @@ pub fn ppmWriter(writer: anytype, width: usize, height: usize) anyerror!void {
     {
         for (0..height) |j| {
             for (0..width) |i| {
-                const r: f64 = @as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(width - 1));
-                const g: f64 = @as(f64, @floatFromInt(j)) / @as(f64, @floatFromInt(height - 1));
-                const b: f64 = 0.0;
-
-                const ir = @as(u8, @intCast(@as(i64, @intFromFloat(255.999 * r))));
-                const ig = @as(u8, @intCast(@as(i64, @intFromFloat(255.999 * g))));
-                const ib = @as(u8, @intCast(@as(i64, @intFromFloat(255.999 * b))));
-
-                try writer.print("{d} {d} {d}\n", .{ ir, ig, ib });
+                const pixel_color = vec3.Vec3.init(@as(f64, @floatFromInt(i)) / @as(f64, @floatFromInt(width - 1)), @as(f64, @floatFromInt(j)) / @as(f64, @floatFromInt((height - 1))), 0.0);
+                try color.write_color(writer, pixel_color);
             }
         }
     }
