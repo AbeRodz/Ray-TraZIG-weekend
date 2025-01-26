@@ -7,21 +7,25 @@ pub const Vec3 = struct {
     x: f64,
     y: f64,
     z: f64,
-
+    const Self = @This();
     /// Constructor to initialize a Vec3
-    pub fn init(x: f64, y: f64, z: f64) Vec3 {
-        return Vec3{ .x = x, .y = y, .z = z };
+    pub fn new(x: f64, y: f64, z: f64) Self {
+        return .{ .x = x, .y = y, .z = z };
     }
     /// vector euclidean magnitude
-    pub fn length(self: Vec3) f64 {
-        return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    pub fn lengthSquared(self: Self) f64 {
+        return self.x * self.x + self.y * self.y + self.z * self.z;
+    }
+
+    pub fn length(self: Self) f64 {
+        return math.sqrt(self.lengthSquared());
     }
 
     // unit length
-    pub fn normalize(self: Vec3) Vec3 {
+    pub fn normalize(self: Self) Self {
         const len = self.length();
         if (len == 0) return self; // Avoid division by zero
-        return Vec3{
+        return .{
             .x = self.x / len,
             .y = self.y / len,
             .z = self.z / len,
@@ -29,8 +33,8 @@ pub const Vec3 = struct {
     }
 
     /// Vec3 addition
-    pub fn add(self: Vec3, other: Vec3) Vec3 {
-        return Vec3{
+    pub fn add(self: Self, other: Self) Self {
+        return .{
             .x = self.x + other.x,
             .y = self.y + other.y,
             .z = self.z + other.z,
@@ -38,8 +42,8 @@ pub const Vec3 = struct {
     }
 
     /// Vec3 substraction
-    pub fn sub(self: Vec3, other: Vec3) Vec3 {
-        return Vec3{
+    pub fn sub(self: Self, other: Self) Self {
+        return .{
             .x = self.x - other.x,
             .y = self.y - other.y,
             .z = self.z - other.z,
@@ -47,25 +51,41 @@ pub const Vec3 = struct {
     }
 
     /// Multiply vector by a scalar
-    pub fn scalarMul(self: Vec3, scalar: f64) Vec3 {
-        return Vec3{
+    pub fn scalarMul(self: Self, scalar: f64) Self {
+        return .{
             .x = self.x * scalar,
             .y = self.y * scalar,
             .z = self.z * scalar,
         };
     }
 
+    /// Divide vector by a scalar
+    pub fn scalarDivision(self: Self, scalar: f64) Self {
+        return .{
+            .x = self.x * (1 / scalar),
+            .y = self.y * (1 / scalar),
+            .z = self.z * (1 / scalar),
+        };
+    }
     /// Dot product with another Vec3
-    pub fn dot(self: Vec3, other: Vec3) f64 {
+    pub fn dot(self: Self, other: Self) f64 {
         return self.x * other.x + self.y * other.y + self.z * other.z;
     }
-
+    pub fn unitVector(self: Self) Self {
+        const len = self.length();
+        if (len == 0) {
+            @panic("Cannot normalize a zero vector");
+        }
+        return self.scalarDivision(len);
+    }
     /// Cross product with another Vec3
-    pub fn cross(self: Vec3, other: Vec3) Vec3 {
-        return Vec3{
+    pub fn cross(self: Self, other: Self) Self {
+        return .{
             .x = self.y * other.z - self.z * other.y,
             .y = self.z * other.x - self.x * other.z,
             .z = self.x * other.y - self.y * other.x,
         };
     }
 };
+
+pub const vec3 = Vec3.new;
