@@ -1,15 +1,13 @@
 const std = @import("std");
 const math = std.math;
 
-pub const rand_gen = std.rand.DefaultPrng;
-
 pub const Vec3 = struct {
     x: f64,
     y: f64,
     z: f64,
     const Self = @This();
     /// Constructor to initialize a Vec3
-    pub fn new(x: f64, y: f64, z: f64) Self {
+    pub fn init(x: f64, y: f64, z: f64) Self {
         return .{ .x = x, .y = y, .z = z };
     }
     /// vector euclidean magnitude
@@ -86,6 +84,9 @@ pub const Vec3 = struct {
             .z = self.x * other.y - self.y * other.x,
         };
     }
+    pub fn negative(self: Self) Self {
+        return vec3(-self.x, -self.y, -self.z);
+    }
 };
 
-pub const vec3 = Vec3.new;
+pub const vec3 = Vec3.init;
