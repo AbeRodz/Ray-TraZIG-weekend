@@ -2,9 +2,10 @@ const std = @import("std");
 const ppm = @import("ppm.zig");
 const Vec3 = @import("vec.zig").Vec3;
 const vec = @import("vec.zig").vec3;
-
+const HitTableList = @import("hittable_list.zig").HitTableList;
 const ray = @import("ray.zig");
 const camera = @import("camera.zig");
+const sphere = @import("sphere.zig").sphere;
 
 pub fn main() !void {
     const aspect_ratio = 16.0 / 9.0;
@@ -12,6 +13,17 @@ pub fn main() !void {
 
     var image_height: u32 = @as(f32, @floatFromInt(image_width)) / aspect_ratio;
     image_height = if (image_height < 1) 1 else image_height;
+
+    // World
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    var world = HitTableList.init(allocator);
+    defer world.deinit();
+
+    try world.add(.{ .sphere = sphere(vec(0, 0, -1), 0.5) });
+    try world.add(.{ .sphere = sphere(vec(0, -100.5, -1), 100) });
 
     const focal_length = 1.0;
     const viewport_height = 2.0;
@@ -30,7 +42,7 @@ pub fn main() !void {
     var buffered_writer = std.io.bufferedWriter(std.io.getStdOut().writer());
     const writer = buffered_writer.writer();
 
-    try ppm.ppmWriter(&writer, image_width, image_height, pixel_delta_u, pixel_delta_v, pixel00_loc, camera_center);
+    try ppm.ppmWriter(&writer, image_width, image_height, pixel_delta_u, pixel_delta_v, pixel00_loc, camera_center, &world);
     try buffered_writer.flush();
     std.debug.print("PPM file generated successfully.\n", .{});
 }
