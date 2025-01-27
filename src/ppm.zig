@@ -10,6 +10,8 @@ const HitRecord = @import("hittable.zig").HitRecord;
 const HitTable = @import("hittable.zig").HitTable;
 const HitTableList = @import("hittable_list.zig").HitTableList;
 const rtweekend = @import("rtweekend.zig");
+const Interval = @import("interval.zig").Interval;
+const interval = @import("interval.zig").interval;
 
 pub fn ppmWriter(writer: anytype, width: u32, height: u32, pixel_delta_u: Vec3, pixel_delta_v: Vec3, pixel00_loc: Vec3, camera_center: Vec3, world: *HitTableList) anyerror!void {
     try writer.print("P3\n{d} {d}\n255\n", .{ width, height });
@@ -22,19 +24,10 @@ pub fn ppmWriter(writer: anytype, width: u32, height: u32, pixel_delta_u: Vec3, 
                 const pixel_center = pixel00_loc.add(pixel_delta_u.scalarMul(i_f)).add(pixel_delta_v.scalarMul(j_f));
                 const ray_direction = pixel_center.sub(camera_center);
                 const rayVec = ray.Ray.init(camera_center, ray_direction);
-                const pixel_color = rayColor(rayVec, world);
+                //const pixel_color = rayColor(rayVec, world);
 
                 try color.write_color(writer, pixel_color);
             }
         }
     }
-}
-pub fn rayColor(r: ray.Ray, world: *HitTableList) Vec3 {
-    var hit_record: HitRecord = undefined;
-    if (world.hit(r, 0, rtweekend.infinity, &hit_record)) {
-        return hit_record.normal.add(vec3(1, 1, 1)).scalarMul(0.5);
-    }
-    const unit_direction = r.direction.unitVector();
-    const a = 0.5 * (unit_direction.y + 1.0);
-    return vec3(1, 1, 1).scalarMul(1.0 - a).add(vec3(0.5, 0.7, 1.0).scalarMul(a));
 }

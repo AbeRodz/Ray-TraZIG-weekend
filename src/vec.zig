@@ -1,8 +1,6 @@
 const std = @import("std");
 const math = std.math;
 
-pub const rand_gen = std.rand.DefaultPrng;
-
 pub const Vec3 = struct {
     x: f64,
     y: f64,
