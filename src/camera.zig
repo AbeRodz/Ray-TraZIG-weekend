@@ -2,6 +2,7 @@ const std = @import("std");
 const math = std.math;
 const vec = @import("vec.zig");
 const color = @import("color.zig");
+const randomOnHemisphere = @import("vec.zig").Vec3.randomOnHemisphere;
 const Vec3 = @import("vec.zig").Vec3;
 const vec3 = @import("vec.zig").vec3;
 const Ray = @import("ray.zig").Ray;
@@ -22,6 +23,7 @@ pub const Camera = struct {
     pixel_delta_u: Vec3,
     pixel_delta_v: Vec3,
     samples_per_pixel: u32 = 10,
+    max_depth: u32 = 10,
 
     const Self = @This();
 
@@ -76,7 +78,7 @@ pub const Camera = struct {
 
                     for (0..self.samples_per_pixel) |_| {
                         const r = self.getRay(i, j);
-                        pixel_color = pixel_color.add(rayColor(r, world));
+                        pixel_color = pixel_color.add(rayColor(r, self.max_depth, world));
                     }
 
                     try color.write_color(writer, pixel_color, self.samples_per_pixel);
@@ -86,10 +88,14 @@ pub const Camera = struct {
         try buffered_writer.flush();
         std.debug.print("PPM file generated successfully.\n", .{});
     }
-    fn rayColor(r: Ray, world: HitTableList) Vec3 {
+    fn rayColor(r: Ray, depth: u32, world: HitTableList) Vec3 {
+        if (depth <= 0) {
+            return vec3(0, 0, 0);
+        }
         var hit_record: HitRecord = undefined;
-        if (world.hit(r, interval(0, rtweekend.infinity), &hit_record)) {
-            return hit_record.normal.add(vec3(1, 1, 1)).scalarMul(0.5);
+        if (world.hit(r, interval(0.001, rtweekend.infinity), &hit_record)) {
+            const direction = randomOnHemisphere(hit_record.normal);
+            return rayColor(ray(hit_record.point, direction), depth - 1, world).scalarMul(0.5);
         }
         const unit_direction = r.direction.unitVector();
         const a = 0.5 * (unit_direction.y + 1.0);

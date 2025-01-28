@@ -1,4 +1,5 @@
 const std = @import("std");
+const rtweekend = @import("rtweekend.zig");
 const math = std.math;
 
 pub const Vec3 = struct {
@@ -76,6 +77,26 @@ pub const Vec3 = struct {
         }
         return self.scalarDivision(len);
     }
+
+    pub fn randomUnitVector() Self {
+        while (true) {
+            const p = Self.random();
+            const lensq = p.lengthSquared();
+
+            if (1e-160 < lensq and lensq <= 1) {
+                return p.scalarDivision(math.sqrt(lensq));
+            }
+        }
+    }
+
+    pub fn randomOnHemisphere(normal: Self) Self {
+        const on_unit_sphere = Self.randomUnitVector();
+
+        if (normal.dot(on_unit_sphere) > 0.0) {
+            return on_unit_sphere;
+        }
+        return on_unit_sphere.negative();
+    }
     /// Cross product with another Vec3
     pub fn cross(self: Self, other: Self) Self {
         return .{
@@ -86,6 +107,21 @@ pub const Vec3 = struct {
     }
     pub fn negative(self: Self) Self {
         return vec3(-self.x, -self.y, -self.z);
+    }
+
+    pub fn random() Self {
+        return .{
+            .x = rtweekend.randomDouble(),
+            .y = rtweekend.randomDouble(),
+            .z = rtweekend.randomDouble(),
+        };
+    }
+    pub fn randomMinMax(min: f64, max: f64) Self {
+        return .{
+            .x = rtweekend.randomDoubleMinMax(min, max),
+            .y = rtweekend.randomDoubleMinMax(min, max),
+            .z = rtweekend.randomDoubleMinMax(min, max),
+        };
     }
 };
 

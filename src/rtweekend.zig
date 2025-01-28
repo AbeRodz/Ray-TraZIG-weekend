@@ -19,3 +19,7 @@ pub fn randomDouble() f64 {
     var prng = std.Random.DefaultPrng.init(seed);
     return prng.random().float(f64);
 }
+
+pub fn randomDoubleMinMax(min: f64, max: f64) f64 {
+    return min + (max - min) * randomDouble();
+}
