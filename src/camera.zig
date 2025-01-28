@@ -93,8 +93,11 @@ pub const Camera = struct {
         }
         var hit_record: HitRecord = undefined;
         if (world.hit(r, interval(0.001, rtweekend.infinity), &hit_record)) {
-            const direction = hit_record.normal.add(Vec3.randomUnitVector());
-            return rayColor(ray(hit_record.point, direction), depth - 1, world).scalarMul(0.1);
+            var scattered: Ray = undefined;
+            var attenuation: Vec3 = undefined;
+            if (hit_record.material.scatter(r, hit_record, &attenuation, &scattered))
+                return attenuation.mul(rayColor(scattered, depth - 1, world));
+            return vec3(0, 0, 0);
         }
         const unit_direction = r.direction.unitVector();
         const a = 0.5 * (unit_direction.y + 1.0);

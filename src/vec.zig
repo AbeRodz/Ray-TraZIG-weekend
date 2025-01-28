@@ -20,6 +20,12 @@ pub const Vec3 = struct {
         return math.sqrt(self.lengthSquared());
     }
 
+    pub fn nearZero(self: Self) bool {
+        const s = 1e-8;
+        return math.approxEqAbs(f64, self.x, 0, s) and
+            math.approxEqAbs(f64, self.y, 0, s) and
+            math.approxEqAbs(f64, self.z, 0, s);
+    }
     // unit length
     pub fn normalize(self: Self) Self {
         const len = self.length();
@@ -47,6 +53,9 @@ pub const Vec3 = struct {
             .y = self.y - other.y,
             .z = self.z - other.z,
         };
+    }
+    pub fn mul(a: Self, b: Self) Self {
+        return .{ .x = a.x * b.x, .y = a.y * b.y, .z = a.z * b.z };
     }
 
     /// Multiply vector by a scalar
@@ -96,6 +105,9 @@ pub const Vec3 = struct {
             return on_unit_sphere;
         }
         return on_unit_sphere.negative();
+    }
+    pub fn reflect(v: Vec3, n: Vec3) Self {
+        return v.sub(n.scalarMul(v.dot(n) * 2));
     }
     /// Cross product with another Vec3
     pub fn cross(self: Self, other: Self) Self {
