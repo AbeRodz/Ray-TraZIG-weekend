@@ -2,7 +2,6 @@ const std = @import("std");
 const math = std.math;
 const vec = @import("vec.zig");
 const color = @import("color.zig");
-const randomOnHemisphere = @import("vec.zig").Vec3.randomOnHemisphere;
 const Vec3 = @import("vec.zig").Vec3;
 const vec3 = @import("vec.zig").vec3;
 const Ray = @import("ray.zig").Ray;
@@ -23,7 +22,7 @@ pub const Camera = struct {
     pixel_delta_u: Vec3,
     pixel_delta_v: Vec3,
     samples_per_pixel: u32 = 10,
-    max_depth: u32 = 10,
+    max_depth: u32 = 50,
 
     const Self = @This();
 
@@ -94,8 +93,8 @@ pub const Camera = struct {
         }
         var hit_record: HitRecord = undefined;
         if (world.hit(r, interval(0.001, rtweekend.infinity), &hit_record)) {
-            const direction = randomOnHemisphere(hit_record.normal);
-            return rayColor(ray(hit_record.point, direction), depth - 1, world).scalarMul(0.5);
+            const direction = hit_record.normal.add(Vec3.randomUnitVector());
+            return rayColor(ray(hit_record.point, direction), depth - 1, world).scalarMul(0.1);
         }
         const unit_direction = r.direction.unitVector();
         const a = 0.5 * (unit_direction.y + 1.0);
