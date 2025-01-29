@@ -11,9 +11,9 @@ pub fn linear_to_gamm(linear_component: f64) f64 {
 }
 
 pub fn write_color(writer: anytype, pixel_color: vec.Vec3, samples_per_pixel: u32) anyerror!void {
-    var r = pixel_color.x;
-    var g = pixel_color.y;
-    var b = pixel_color.z;
+    var r = pixel_color.x();
+    var g = pixel_color.y();
+    var b = pixel_color.z();
 
     const scale = 1.0 / @as(f64, @floatFromInt(samples_per_pixel));
     r *= scale;

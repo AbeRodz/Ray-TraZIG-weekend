@@ -102,7 +102,9 @@ pub const Camera = struct {
                     var pixel_color = vec3(0, 0, 0);
 
                     for (0..self.samples_per_pixel) |_| {
-                        const r = self.getRay(i, j);
+                        const i_f = @as(f64, @floatFromInt(i));
+                        const j_f = @as(f64, @floatFromInt(j));
+                        const r = self.getRay(i_f, j_f);
                         pixel_color = pixel_color.add(rayColor(r, self.max_depth, world));
                     }
 
@@ -114,28 +116,34 @@ pub const Camera = struct {
         std.debug.print("PPM file generated successfully.\n", .{});
     }
     fn rayColor(r: Ray, depth: u32, world: HitTableList) Vec3 {
-        if (depth <= 0) {
-            return vec3(0, 0, 0);
+        var current_ray = r;
+        var current_depth = depth;
+        var colorVec = vec3(1, 1, 1); // Accumulator for attenuation
+
+        while (current_depth > 0) {
+            var hit_record: HitRecord = undefined;
+            if (world.hit(current_ray, interval(0.001, rtweekend.infinity), &hit_record)) {
+                var scattered: Ray = undefined;
+                var attenuation: Vec3 = undefined;
+                if (!hit_record.material.scatter(current_ray, hit_record, &attenuation, &scattered)) {
+                    return vec3(0, 0, 0);
+                }
+                colorVec = colorVec.mul(attenuation);
+                current_ray = scattered;
+            } else {
+                const unit_direction = current_ray.direction.unitVector();
+                const a = 0.5 * (unit_direction.y() + 1.0);
+                return colorVec.mul(vec3(1, 1, 1).scalarMul(1.0 - a).add(vec3(0.5, 0.7, 1.0).scalarMul(a)));
+            }
+            current_depth -= 1;
         }
-        var hit_record: HitRecord = undefined;
-        if (world.hit(r, interval(0.001, rtweekend.infinity), &hit_record)) {
-            var scattered: Ray = undefined;
-            var attenuation: Vec3 = undefined;
-            if (hit_record.material.scatter(r, hit_record, &attenuation, &scattered))
-                return attenuation.mul(rayColor(scattered, depth - 1, world));
-            return vec3(0, 0, 0);
-        }
-        const unit_direction = r.direction.unitVector();
-        const a = 0.5 * (unit_direction.y + 1.0);
-        return vec3(1, 1, 1).scalarMul(1.0 - a).add(vec3(0.5, 0.7, 1.0).scalarMul(a));
+        return vec3(0, 0, 0);
     }
 
-    fn getRay(self: Self, i: usize, j: usize) Ray {
-        const i_f = @as(f64, @floatFromInt(i));
-        const j_f = @as(f64, @floatFromInt(j));
+    fn getRay(self: Self, i: f64, j: f64) Ray {
         const offset = sampleSquare();
 
-        const pixel_sample = self.pixel00_loc.add(self.pixel_delta_u.scalarMul((offset.x + i_f)).add(self.pixel_delta_v.scalarMul((offset.y + j_f))));
+        const pixel_sample = self.pixel00_loc.add(self.pixel_delta_u.scalarMul((offset.x() + i)).add(self.pixel_delta_v.scalarMul((offset.y() + j))));
         const ray_origin = if (self.defocus_angle <= 0) self.camera_center else self.defocus_disk_sample();
         const ray_direction = pixel_sample.sub(ray_origin);
         return ray(ray_origin, ray_direction);
@@ -143,7 +151,7 @@ pub const Camera = struct {
     fn defocus_disk_sample(self: Self) Vec3 {
         // Returns a random point in the camera defocus disk.
         const p = Vec3.randomInUnitDisk();
-        return self.camera_center.add(self.defocus_disk_u.scalarMul(p.x)).add(self.defocus_disk_v.scalarMul(p.y));
+        return self.camera_center.add(self.defocus_disk_u.scalarMul(p.x())).add(self.defocus_disk_v.scalarMul(p.y()));
     }
 };
 
