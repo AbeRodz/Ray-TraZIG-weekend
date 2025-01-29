@@ -109,6 +109,14 @@ pub const Vec3 = struct {
     pub fn reflect(v: Vec3, n: Vec3) Self {
         return v.sub(n.scalarMul(v.dot(n) * 2));
     }
+
+    pub fn refract(uv: Vec3, n: Vec3, etai_over_etat: f64) Self {
+        const cost_theta = rtweekend.fmin(uv.dot(n), 1.0);
+        const r_out_perp = n.scalarMul(cost_theta).add(uv).scalarMul(etai_over_etat);
+        const r_out_parallel = n.scalarMul(math.sqrt(rtweekend.fabs(1.0 - r_out_perp.lengthSquared())));
+
+        return r_out_perp.add(r_out_parallel);
+    }
     /// Cross product with another Vec3
     pub fn cross(self: Self, other: Self) Self {
         return .{
