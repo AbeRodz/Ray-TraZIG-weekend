@@ -3,6 +3,7 @@ const Ray = @import("ray.zig").Ray;
 const Vec3 = @import("vec.zig").Vec3;
 const Sphere = @import("sphere.zig").Sphere;
 const Interval = @import("interval.zig").Interval;
+const Material = @import("material.zig").Material;
 
 pub const HitTable = union(enum) {
     sphere: Sphere,
@@ -16,6 +17,7 @@ pub const HitTable = union(enum) {
 pub const HitRecord = struct {
     point: Vec3,
     normal: Vec3,
+    material: *const Material,
     t: f64,
     front_face: bool,
 
