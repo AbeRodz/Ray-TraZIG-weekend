@@ -86,6 +86,13 @@ pub const Vec3 = struct {
         }
         return self.scalarDivision(len);
     }
+    pub fn randomInUnitDisk() Self {
+        while (true) {
+            const p = vec3(rtweekend.randomDoubleMinMax(-1, 1), rtweekend.randomDoubleMinMax(-1, 1), 0);
+            if (p.lengthSquared() < 1)
+                return p;
+        }
+    }
 
     pub fn randomUnitVector() Self {
         while (true) {

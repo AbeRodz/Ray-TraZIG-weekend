@@ -23,6 +23,17 @@ pub const Camera = struct {
     pixel_delta_v: Vec3,
     samples_per_pixel: u32 = 10,
     max_depth: u32 = 50,
+    vfov: f64 = 90,
+    lookfrom: Vec3 = vec3(0, 0, 0), // Point camera is looking from
+    lookat: Vec3 = vec3(0, 0, -1), // Point camera is looking at
+    vup: Vec3 = vec3(0, 1, 0),
+    defocus_angle: f64 = 0, // Variation angle of rays through each pixel
+    focus_dist: f64 = 10,
+    defocus_disk_u: Vec3,
+    defocus_disk_v: Vec3,
+    v: Vec3,
+    u: Vec3,
+    w: Vec3,
 
     const Self = @This();
 
@@ -39,28 +50,43 @@ pub const Camera = struct {
             .focal_length = focal_length,
             .viewport_height = viewport_height,
             .camera_center = camera_center,
-
             .image_height = undefined,
             .pixel00_loc = undefined,
             .pixel_delta_u = undefined,
             .pixel_delta_v = undefined,
+            .v = undefined,
+            .w = undefined,
+            .u = undefined,
+            .defocus_disk_u = undefined,
+            .defocus_disk_v = undefined,
         };
     }
     pub fn initialize(self: *Self) void {
         self.image_height = @as(u32, @intFromFloat(@as(f32, @floatFromInt(self.image_width)) / self.aspect_ratio));
         self.image_height = if (self.image_height < 1) 1 else self.image_height;
 
-        //const focal_length = 1.0;
-        //const viewport_height = 2.0;
+        self.camera_center = self.lookfrom;
+
+        const theta = rtweekend.degreesToRadians(self.vfov);
+        const h: f64 = math.tan(theta / 2);
+
+        self.viewport_height = 2 * h * self.focus_dist;
         const viewport_width = self.viewport_height * (@as(f64, @floatFromInt(self.image_width)) / @as(f64, @floatFromInt(self.image_height)));
 
-        const viewport_u = vec3(viewport_width, 0, 0);
-        const viewport_v = vec3(0, -self.viewport_height, 0);
+        self.w = self.lookfrom.sub(self.lookat).unitVector();
+        self.u = self.vup.cross(self.w).unitVector();
+        self.v = self.w.cross(self.u);
 
+        // Calculate the vectors across the horizontal and down the vertical viewport edges.
+        const viewport_u = self.u.scalarMul(viewport_width); // Vector across viewport horizontal edge
+        const viewport_v = self.v.negative().scalarMul(self.viewport_height);
         self.pixel_delta_u = viewport_u.scalarDivision(@floatFromInt(self.image_width));
         self.pixel_delta_v = viewport_v.scalarDivision(@floatFromInt(self.image_height));
 
-        const viewport_upper_left = self.camera_center.sub(vec3(0, 0, self.focal_length)).sub(viewport_u.scalarDivision(2)).sub(viewport_v.scalarDivision(2));
+        const viewport_upper_left = self.camera_center.sub(self.w.scalarMul(self.focus_dist)).sub(viewport_u.scalarDivision(2)).sub(viewport_v.scalarDivision(2));
+        const defocus_radius = self.focus_dist * math.tan(rtweekend.degreesToRadians(self.defocus_angle / 2));
+        self.defocus_disk_u = self.u.scalarMul(defocus_radius);
+        self.defocus_disk_v = self.v.scalarMul(defocus_radius);
         self.pixel00_loc = viewport_upper_left.add(self.pixel_delta_u.add(self.pixel_delta_v).scalarMul(0.5));
     }
 
@@ -110,9 +136,14 @@ pub const Camera = struct {
         const offset = sampleSquare();
 
         const pixel_sample = self.pixel00_loc.add(self.pixel_delta_u.scalarMul((offset.x + i_f)).add(self.pixel_delta_v.scalarMul((offset.y + j_f))));
-        const ray_origin = self.camera_center;
+        const ray_origin = if (self.defocus_angle <= 0) self.camera_center else self.defocus_disk_sample();
         const ray_direction = pixel_sample.sub(ray_origin);
         return ray(ray_origin, ray_direction);
+    }
+    fn defocus_disk_sample(self: Self) Vec3 {
+        // Returns a random point in the camera defocus disk.
+        const p = Vec3.randomInUnitDisk();
+        return self.camera_center.add(self.defocus_disk_u.scalarMul(p.x)).add(self.defocus_disk_v.scalarMul(p.y));
     }
 };
 
