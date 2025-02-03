@@ -18,6 +18,12 @@ pub const Interval = struct {
             .max = max,
         };
     }
+    pub fn intervalByBox(a: Interval, b: Interval) Self {
+        return .{
+            .min = if (a.min <= b.min) a.min else b.min,
+            .max = if (a.max >= b.max) a.max else b.max,
+        };
+    }
     pub fn size(self: Self) f64 {
         return self.max - self.min;
     }
@@ -33,6 +39,10 @@ pub const Interval = struct {
         if (x > self.max) return self.max;
         return x;
     }
+    pub fn expand(self: Self, delta: f64) Self {
+        const padding = delta / 2;
+        return Self(self.min - padding, self.max + padding);
+    }
 };
 
 pub const empty = Interval{
@@ -46,3 +56,4 @@ pub const universe = Interval{
 };
 
 pub const interval = Interval.init;
+pub const intervalByBox = Interval.intervalByBox;

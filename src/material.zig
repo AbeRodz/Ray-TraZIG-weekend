@@ -1,6 +1,5 @@
 const std = @import("std");
 const math = std.math;
-const HitTable = @import("hittable.zig").HitTable;
 const HitRecord = @import("hittable.zig").HitRecord;
 const Vec3 = @import("vec.zig").Vec3;
 const vec = @import("vec.zig").vec3;
@@ -30,12 +29,11 @@ pub const Lambertian = struct {
         };
     }
     pub fn scatter(self: Self, r_in: Ray, rec: HitRecord, attenuation: *Vec3, scattered: *Ray) bool {
-        _ = r_in;
         var scatter_direction = rec.normal.add(Vec3.randomUnitVector());
         if (scatter_direction.nearZero()) {
             scatter_direction = rec.normal;
         }
-        scattered.* = ray(rec.point, scatter_direction);
+        scattered.* = ray(rec.point, scatter_direction, r_in.tm);
         attenuation.* = self.albedo;
         return true;
     }
@@ -53,7 +51,7 @@ pub const Metal = struct {
     }
     pub fn scatter(self: Self, r_in: Ray, rec: HitRecord, attenuation: *Vec3, scattered: *Ray) bool {
         const reflected = Vec3.reflect(r_in.direction.unitVector(), rec.normal);
-        scattered.* = ray(rec.point, reflected.add(Vec3.randomUnitVector().scalarMul(self.fuzz)));
+        scattered.* = ray(rec.point, reflected.add(Vec3.randomUnitVector().scalarMul(self.fuzz)), r_in.tm);
         attenuation.* = self.albedo;
         return scattered.direction.dot(rec.normal) > 0;
     }
@@ -85,7 +83,7 @@ pub const Dielectric = struct {
             direction = Vec3.refract(unit_direction, rec.normal, ri);
         }
 
-        scattered.* = ray(rec.point, direction);
+        scattered.* = ray(rec.point, direction, r_in.tm);
         return true;
     }
     inline fn reflectance(cosine: f64, refraction_index: f64) f64 {

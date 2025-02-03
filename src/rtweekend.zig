@@ -6,11 +6,11 @@ pub const infinity = std.math.floatMax(f64);
 pub const pi = std.math.pi;
 
 // utilities
-pub fn degreesToRadians(degrees: f64) f64 {
+pub inline fn degreesToRadians(degrees: f64) f64 {
     return degrees * pi / 180.0;
 }
 
-pub fn randomDouble() f64 {
+pub inline fn randomDouble() f64 {
     var seed: u64 = undefined;
     std.posix.getrandom(std.mem.asBytes(&seed)) catch |err| {
         std.debug.print("error:{}", .{err});
@@ -20,14 +20,21 @@ pub fn randomDouble() f64 {
     return prng.random().float(f64);
 }
 
-pub fn randomDoubleMinMax(min: f64, max: f64) f64 {
+pub inline fn randomDoubleMinMax(min: f64, max: f64) f64 {
     return min + (max - min) * randomDouble();
 }
-
-pub fn fmin(a: f64, b: f64) f64 {
-    return if (a < b) a else b;
+pub inline fn randomInt(min: i64, max: i64) i64 {
+    // Returns a random integer in [min,max].
+    return @as(i64, @intFromFloat(randomDoubleMinMax(min, max + 1)));
 }
 
-pub fn fabs(n: f64) f64 {
+pub inline fn fmin(a: f64, b: f64) f64 {
+    return if (a < b) a else b;
+}
+pub inline fn fmax(a: f64, b: f64) f64 {
+    return if (a > b) a else b;
+}
+
+pub inline fn fabs(n: f64) f64 {
     return if (n < 0.0) -n else n;
 }

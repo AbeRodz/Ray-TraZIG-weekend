@@ -7,6 +7,7 @@ const vec3 = @import("vec.zig").vec3;
 const Ray = @import("ray.zig").Ray;
 const ray = @import("ray.zig").ray;
 const HitTableList = @import("hittable_list.zig").HitTableList;
+const BVHNode = @import("bvh.zig").BVHNode;
 const HitRecord = @import("hittable.zig").HitRecord;
 const interval = @import("interval.zig").interval;
 const rtweekend = @import("rtweekend.zig");
@@ -90,7 +91,7 @@ pub const Camera = struct {
         self.pixel00_loc = viewport_upper_left.add(self.pixel_delta_u.add(self.pixel_delta_v).scalarMul(0.5));
     }
 
-    pub fn render(self: *Self, world: HitTableList) !void {
+    pub fn render(self: *Self, world: BVHNode) !void {
         self.initialize();
 
         var buffered_writer = std.io.bufferedWriter(std.io.getStdOut().writer());
@@ -115,7 +116,7 @@ pub const Camera = struct {
         try buffered_writer.flush();
         std.debug.print("PPM file generated successfully.\n", .{});
     }
-    fn rayColor(r: Ray, depth: u32, world: HitTableList) Vec3 {
+    fn rayColor(r: Ray, depth: u32, world: BVHNode) Vec3 {
         var current_ray = r;
         var current_depth = depth;
         var colorVec = vec3(1, 1, 1); // Accumulator for attenuation
@@ -146,7 +147,8 @@ pub const Camera = struct {
         const pixel_sample = self.pixel00_loc.add(self.pixel_delta_u.scalarMul((offset.x() + i)).add(self.pixel_delta_v.scalarMul((offset.y() + j))));
         const ray_origin = if (self.defocus_angle <= 0) self.camera_center else self.defocus_disk_sample();
         const ray_direction = pixel_sample.sub(ray_origin);
-        return ray(ray_origin, ray_direction);
+        const ray_time = rtweekend.randomDouble();
+        return ray(ray_origin, ray_direction, ray_time);
     }
     fn defocus_disk_sample(self: Self) Vec3 {
         // Returns a random point in the camera defocus disk.
