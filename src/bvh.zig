@@ -9,6 +9,16 @@ const Interval = @import("interval.zig").Interval;
 const ArrayList = @import("std").ArrayList;
 const rtweekend = @import("rtweekend.zig");
 const Allocator = std.mem.Allocator;
+const Thread = std.Thread;
+
+const InitArgs = struct {
+    allocator: *Allocator,
+    objects: std.ArrayList(HitTable),
+    start: usize,
+    end: usize,
+    results: *std.ArrayList(*BVHNode),
+    mutex: *Thread.Mutex,
+};
 
 pub const BVHNode = struct {
     left: *HitTable,
@@ -20,6 +30,24 @@ pub const BVHNode = struct {
         return try Self.init(allocator, list.objects, 0, list.objects.items.len);
     }
 
+    fn initLeftNode(args: *InitArgs) !void {
+        const left_node = try args.allocator.create(BVHNode);
+        left_node.* = try Self.init(args.allocator, args.objects, args.start, args.end);
+
+        args.mutex.lock();
+        defer args.mutex.unlock();
+        try args.results.*.append(left_node);
+    }
+
+    fn initRightNode(args: *InitArgs) !void {
+        const right_node = try args.allocator.create(BVHNode);
+        right_node.* = try Self.init(args.allocator, args.objects, args.start, args.end);
+
+        args.mutex.lock();
+        defer args.mutex.unlock();
+
+        try args.results.*.append(right_node);
+    }
     pub fn init(allocator: *Allocator, objects: std.ArrayList(HitTable), start: usize, end: usize) !Self {
         const object_span = end - start;
 
@@ -64,19 +92,43 @@ pub const BVHNode = struct {
 
         const mid = start + object_span / 2;
 
-        // Recursively construct BVH nodes
-        const left_node = try allocator.create(BVHNode);
-        left_node.* = try Self.init(allocator, objects, start, mid);
+        var results: std.ArrayList(*BVHNode) = std.ArrayList(*BVHNode).init(allocator.*);
+        try results.ensureTotalCapacity(2);
+        var mutex = Thread.Mutex{};
 
-        const right_node = try allocator.create(BVHNode);
-        right_node.* = try Self.init(allocator, objects, mid, end);
+        var left_args = InitArgs{
+            .allocator = allocator,
+            .objects = objects,
+            .start = start,
+            .end = mid,
+            .results = &results,
+            .mutex = &mutex,
+        };
+        var right_args = InitArgs{
+            .allocator = allocator,
+            .objects = objects,
+            .start = mid,
+            .end = end,
+            .results = &results,
+            .mutex = &mutex,
+        };
+        const threadConfig = Thread.SpawnConfig{
+            .stack_size = 1024 * 16,
+        };
+        const thread1 = try Thread.spawn(threadConfig, initLeftNode, .{&left_args});
+        const thread2 = try Thread.spawn(threadConfig, initRightNode, .{&right_args});
 
-        // Wrap them in HitTable
+        thread1.join();
+        thread2.join();
+
+        const left_node_ptr = results.items[0];
+        const right_node_ptr = results.items[1];
+
         const left: *HitTable = try allocator.create(HitTable);
-        left.* = HitTable{ .bvhNode = left_node.* };
+        left.* = HitTable{ .bvhNode = left_node_ptr.* };
 
         const right: *HitTable = try allocator.create(HitTable);
-        right.* = HitTable{ .bvhNode = right_node.* };
+        right.* = HitTable{ .bvhNode = right_node_ptr.* };
 
         return Self{
             .left = left,
@@ -85,66 +137,7 @@ pub const BVHNode = struct {
         };
     }
 
-    // pub fn init(allocator: *Allocator, objects: ArrayList(HitTable), start: usize, end: usize) !Self {
-    //     const object_span = end - start;
-    //     // const leftNode = try allocator.create(BVHNode);
-    //     // const rightNode = try allocator.create(BVHNode);
-
-    //     var left = try allocator.create(HitTable);
-    //     var right = try allocator.create(HitTable);
-    //     var bbox: aabb = undefined;
-
-    //     // Calculate bounding box
-    //     for (start..end) |object_index| {
-    //         bbox = AABBBoxes(bbox, objects.items[object_index].bounding_box());
-    //     }
-
-    //     const axis = bbox.longestAxis();
-
-    //     if (object_span == 1) {
-    //         left = &objects.items[start]; // Store the object in the node
-    //         right = left; // In case it's the same object
-    //     } else if (object_span == 2) {
-    //         left = &objects.items[start]; // Store the object in the node
-    //         right = &objects.items[start + 1]; // Store the object in the node
-    //     } else {
-    //         // Sort objects by selected axis
-    //         switch (axis) {
-    //             0 => std.mem.sortUnstable(HitTable, objects.items[start..end], {}, boxXCompare),
-    //             1 => std.mem.sortUnstable(HitTable, objects.items[start..end], {}, boxYCompare),
-    //             2 => std.mem.sortUnstable(HitTable, objects.items[start..end], {}, boxZCompare),
-    //             else => unreachable,
-    //         }
-
-    //         const mid = start + object_span / 2;
-
-    //         // Initialize left and right nodes
-    //         var leftNode = try Self.init(allocator, objects, start, mid);
-    //         var rightNode = try Self.init(allocator, objects, mid, end);
-    //     }
-
-    //     // Create the current node and assign left and right children
-    //     var node = BVHNode{ .left = left }; // Initialize with the 'left' field
-
-    //     // Reinitialize the union to set the 'right' field
-    //     node = BVHNode{ .right = right };
-
-    //     // Now you can assign the 'bbox' field, since 'right' is the active field
-    //     node = BVHNode{ .bbox = bbox };
-
-    //     // Assign the right and bounding box fields afterward
-    //     //node.right = right;
-    //     //node.bbox = bbox;
-    //     // const node = try allocator.create(BVHNode);
-
-    //     // node.*.bbox = bbox;
-
-    //     // node.*.left = left;
-    //     // node.*.right = right;
-
-    //     return node;
-    // }
-    pub fn boxCompare(a: HitTable, b: HitTable, axisIndex: u8) bool {
+    pub inline fn boxCompare(a: HitTable, b: HitTable, axisIndex: u8) bool {
         const a_axis_interval = a.bounding_box().axis_interval(axisIndex);
         const b_axis_interval = b.bounding_box().axis_interval(axisIndex);
         return a_axis_interval.min < b_axis_interval.min;

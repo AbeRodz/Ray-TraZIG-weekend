@@ -75,7 +75,7 @@ pub fn main() !void {
     const material3 = Material{ .metal = Metal.init(vec(0.7, 0.6, 0.5), 0.0) };
     try world.add(.{ .sphere = sphere(vec(4, 1, 0), 1.0, &material3) });
 
-    const bvh_root = try BVHNode.initFromList(&allocator, &world);
+    var bvh_root = try BVHNode.initFromList(&allocator, &world);
 
     //try world.add(bvh_root.HitTable);
     var cam = camera.Camera.init(aspect_ratio, image_width, focal_length, viewport_height, camera_center);
@@ -86,5 +86,5 @@ pub fn main() !void {
     cam.vup = vec(0, 1, 0);
     cam.defocus_angle = 0.6;
     cam.focus_dist = 10.0;
-    try cam.render(bvh_root);
+    try cam.render(&bvh_root, &allocator);
 }
