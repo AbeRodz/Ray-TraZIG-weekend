@@ -6,6 +6,7 @@ const vec = @import("vec.zig").vec3;
 const Ray = @import("ray.zig").Ray;
 const ray = @import("ray.zig").ray;
 const rtweekend = @import("rtweekend.zig");
+const texture = @import("texture.zig");
 
 pub const Material = union(enum) {
     lambertian: Lambertian,
@@ -21,12 +22,16 @@ pub const Material = union(enum) {
 };
 
 pub const Lambertian = struct {
-    albedo: Vec3,
+    texture: texture.Texture,
+
     const Self = @This();
-    pub fn init(c: Vec3) Self {
-        return .{
-            .albedo = c,
-        };
+
+    pub fn init(albedo: Vec3) Self {
+        return .{ .texture = texture.Texture{ .solidColor = .{ .albedo = albedo } } };
+    }
+
+    pub fn initTexture(tex: texture.Texture) Self {
+        return .{ .texture = tex };
     }
     pub fn scatter(self: Self, r_in: Ray, rec: HitRecord, attenuation: *Vec3, scattered: *Ray) bool {
         var scatter_direction = rec.normal.add(Vec3.randomUnitVector());
@@ -34,7 +39,7 @@ pub const Lambertian = struct {
             scatter_direction = rec.normal;
         }
         scattered.* = ray(rec.point, scatter_direction, r_in.tm);
-        attenuation.* = self.albedo;
+        attenuation.* = self.texture.value(rec.u, rec.v, &rec.point);
         return true;
     }
 };

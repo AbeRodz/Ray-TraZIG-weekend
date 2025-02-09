@@ -14,7 +14,9 @@ const rtweekend = @import("rtweekend.zig");
 const randomDouble = @import("rtweekend.zig").randomDouble;
 const randomDoubleMinMax = @import("rtweekend.zig").randomDoubleMinMax;
 const BVHNode = @import("bvh.zig").BVHNode;
+const texture = @import("texture.zig");
 
+pub fn bouncingSperes() void {}
 pub fn main() !void {
     const aspect_ratio = 16.0 / 9.0;
     const image_width: u32 = 400;
@@ -32,7 +34,10 @@ pub fn main() !void {
     defer arena.deinit();
     const arena_allocator = arena.allocator();
 
-    const ground_material = Material{ .lambertian = Lambertian.init(vec(0.5, 0.5, 0.5)) };
+    var even = texture.Texture{ .solidColor = texture.SolidColor.init(vec(0.2, 0.3, 0.1)) };
+    var odd = texture.Texture{ .solidColor = texture.SolidColor.init(vec(0.9, 0.9, 0.9)) };
+    const checker = texture.CheckTexture.init(0.32, &even, &odd);
+    const ground_material = Material{ .lambertian = Lambertian.initTexture(texture.Texture{ .checkTexture = checker }) };
     try world.add(.{ .sphere = sphere(vec(0, -1000, 0), 1000, &ground_material) });
 
     var a: i32 = -3;

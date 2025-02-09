@@ -28,6 +28,8 @@ pub const HitRecord = struct {
     normal: Vec3,
     material: *const Material,
     t: f64,
+    u: f64,
+    v: f64,
     front_face: bool,
 
     const Self = @This();

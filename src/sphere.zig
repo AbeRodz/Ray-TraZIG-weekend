@@ -31,7 +31,13 @@ pub const Sphere = struct {
             .bbox = AABBBounded(static_center.sub(rvec), static_center.add(rvec)),
         };
     }
+    pub fn getSphereUV(p: Vec3, u: *f64, v: *f64) void {
+        const theta = math.acos(-p.y());
+        const phi = math.atan2(-p.z(), p.x()) + math.pi;
 
+        u.* = phi / (2 * math.pi);
+        v.* = theta / math.pi;
+    }
     pub fn initMoving(center1: Vec3, center2: Vec3, radius: comptime_float, material: *const Material) Self {
         var sphereTemp = Self{
             .center = rayNoTime(center1, center2.sub(center1)),
@@ -69,6 +75,7 @@ pub const Sphere = struct {
         hit_record.point = r.at(hit_record.t);
         const outward_normal = hit_record.point.sub(current_center).scalarDivision(self.radius);
         hit_record.setFaceNormal(r, outward_normal);
+        getSphereUV(outward_normal, &hit_record.u, &hit_record.v);
         hit_record.material = self.material;
         return true;
     }

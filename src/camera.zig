@@ -105,9 +105,9 @@ pub const Camera = struct {
         for (start_row..end_row) |j| {
             for (0..camera.image_width) |i| {
                 var pixel_color = vec3(0, 0, 0);
+                const i_f = @as(f64, @floatFromInt(i));
+                const j_f = @as(f64, @floatFromInt(j));
                 for (0..camera.samples_per_pixel) |_| {
-                    const i_f = @as(f64, @floatFromInt(i));
-                    const j_f = @as(f64, @floatFromInt(j));
                     const r = camera.getRay(i_f, j_f);
                     pixel_color = pixel_color.add(rayColor(r, camera.max_depth, world));
                 }
