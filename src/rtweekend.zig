@@ -25,9 +25,14 @@ pub inline fn randomDoubleMinMax(min: f64, max: f64) f64 {
 }
 pub inline fn randomInt(min: i64, max: i64) i64 {
     // Returns a random integer in [min,max].
-    return @as(i64, @intFromFloat(randomDoubleMinMax(min, max + 1)));
+    return @as(i64, @intFromFloat(randomDoubleMinMax(@as(f64, @floatFromInt(min)), @as(f64, @floatFromInt(max + 1)))));
 }
-
+pub inline fn randomInt16(min: u16, max: u16) u16 {
+    return @min(max, @as(u16, @intFromFloat(randomDoubleMinMax(@as(f64, @floatFromInt(min)), @as(f64, @floatFromInt(max + 1))))));
+}
+pub inline fn randomInt8(min: u8, max: u8) u8 {
+    return @min(max, @as(u8, @intFromFloat(randomDoubleMinMax(@as(f64, @floatFromInt(min)), @as(f64, @floatFromInt(max + 1))))));
+}
 pub inline fn fmin(a: f64, b: f64) f64 {
     return if (a < b) a else b;
 }

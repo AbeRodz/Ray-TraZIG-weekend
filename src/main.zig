@@ -15,9 +15,83 @@ const randomDouble = @import("rtweekend.zig").randomDouble;
 const randomDoubleMinMax = @import("rtweekend.zig").randomDoubleMinMax;
 const BVHNode = @import("bvh.zig").BVHNode;
 const texture = @import("texture.zig");
+const rtwSTB = @import("rtw_stb_image.zig");
 
-pub fn bouncingSperes() void {}
-pub fn main() !void {
+pub fn perlinSpheres() !void {
+    const aspect_ratio = 16.0 / 9.0;
+    const image_width: u32 = 400;
+    const focal_length = 1.0;
+    const viewport_height = 2.0;
+    const camera_center = vec(0, 0, 0);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
+    var world = HitTableList.init(allocator);
+
+    defer world.deinit();
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_allocator = arena.allocator();
+
+    const perlin_texture = try texture.NoiseTexture.init(&allocator);
+
+    const material_heap = try arena_allocator.create(Material);
+    material_heap.* = Material{ .lambertian = Lambertian.initTexture(texture.Texture{ .noiseTexture = perlin_texture }) };
+
+    const material_heap_2 = try arena_allocator.create(Material);
+    material_heap_2.* = Material{ .lambertian = Lambertian.initTexture(texture.Texture{ .noiseTexture = perlin_texture }) };
+
+    try world.add(.{ .sphere = sphere(vec(0, -1000, 0), 1000, material_heap) });
+    try world.add(.{ .sphere = sphere(vec(0, 2, 0), 2, material_heap_2) });
+    var bvh_root = try BVHNode.initFromList(&allocator, &world);
+
+    var cam = camera.Camera.init(aspect_ratio, image_width, focal_length, viewport_height, camera_center);
+    cam.samples_per_pixel = 100;
+    cam.vfov = 20;
+    cam.lookfrom = vec(13, 2, 3);
+    cam.lookat = vec(0, 0, 0);
+    cam.vup = vec(0, 1, 0);
+    cam.defocus_angle = 0.0;
+    cam.focus_dist = 10.0;
+    try cam.render(&bvh_root, &allocator);
+}
+
+pub fn earth() !void {
+    const aspect_ratio = 16.0 / 9.0;
+    const image_width: u32 = 400;
+    const focal_length = 1.0;
+    const viewport_height = 2.0;
+    const camera_center = vec(0, 0, 0);
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
+
+    var world = HitTableList.init(allocator);
+
+    defer world.deinit();
+    const earth_image = try allocator.create(rtwSTB.Image);
+    earth_image.* = try rtwSTB.Image.init("earthmap.jpg", allocator);
+    std.debug.print("Image dimensions: {}x{}\n", .{ earth_image.width, earth_image.height });
+
+    const earth_texture = texture.ImageTexture.init(earth_image);
+    const earth_surface = Material{ .lambertian = Lambertian.initTexture(texture.Texture{ .imageTexture = earth_texture }) };
+
+    try world.add(.{ .sphere = sphere(vec(0, 0, 0), 2, &earth_surface) });
+
+    // Free allocated resources when done
+    //earth_image.deinit(allocator);
+    //allocator.destroy(earth_image);
+    var bvh_root = try BVHNode.initFromList(&allocator, &world);
+
+    var cam = camera.Camera.init(aspect_ratio, image_width, focal_length, viewport_height, camera_center);
+    cam.samples_per_pixel = 100;
+    cam.vfov = 20;
+    cam.lookfrom = vec(0, 0, 12);
+    cam.lookat = vec(0, 0, 0);
+    cam.vup = vec(0, 1, 0);
+    cam.defocus_angle = 0.0;
+    cam.focus_dist = 10.0;
+    try cam.render(&bvh_root, &allocator);
+}
+pub fn bouncingSperes() !void {
     const aspect_ratio = 16.0 / 9.0;
     const image_width: u32 = 400;
     const focal_length = 1.0;
@@ -92,4 +166,7 @@ pub fn main() !void {
     cam.defocus_angle = 0.6;
     cam.focus_dist = 10.0;
     try cam.render(&bvh_root, &allocator);
+}
+pub fn main() !void {
+    try perlinSpheres();
 }
