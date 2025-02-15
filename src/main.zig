@@ -32,7 +32,7 @@ pub fn perlinSpheres() !void {
     defer arena.deinit();
     const arena_allocator = arena.allocator();
 
-    const perlin_texture = try texture.NoiseTexture.init(&allocator);
+    const perlin_texture = try texture.NoiseTexture.init(&allocator, 4);
 
     const material_heap = try arena_allocator.create(Material);
     material_heap.* = Material{ .lambertian = Lambertian.initTexture(texture.Texture{ .noiseTexture = perlin_texture }) };

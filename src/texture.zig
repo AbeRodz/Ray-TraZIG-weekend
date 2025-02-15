@@ -99,8 +99,10 @@ pub const ImageTexture = struct {
 
 pub const NoiseTexture = struct {
     noise: *perlin.Perlin,
+    scale: f64,
+
     const Self = @This();
-    pub fn init(allocator: *std.mem.Allocator) !Self {
+    pub fn init(allocator: *std.mem.Allocator, scale: f64) !Self {
         // 1) Allocate memory on the heap for the Perlin struct
         const noise_ptr = try allocator.create(perlin.Perlin);
 
@@ -108,9 +110,9 @@ pub const NoiseTexture = struct {
         noise_ptr.* = perlin.Perlin.init();
 
         // 3) Store that pointer in `NoiseTexture.noise`
-        return .{ .noise = noise_ptr };
+        return .{ .noise = noise_ptr, .scale = scale };
     }
     pub fn value(self: Self, _: f64, _: f64, p: *const Vec3) Vec3 {
-        return vec(1, 1, 1).scalarMul(self.noise.noise(p));
+        return vec(0.5, 0.5, 0.5).scalarMul(self.noise.turb(p, 7)).scalarMul(1 + math.sin(self.scale * p.z() + 10));
     }
 };
