@@ -9,6 +9,7 @@ const ray = @import("ray.zig").ray;
 const HitTableList = @import("hittable_list.zig").HitTableList;
 const BVHNode = @import("bvh.zig").BVHNode;
 const HitRecord = @import("hittable.zig").HitRecord;
+const HitRecordPool = @import("hittable.zig").HitRecordPool;
 const interval = @import("interval.zig").interval;
 const rtweekend = @import("rtweekend.zig");
 const Thread = std.Thread;
@@ -29,6 +30,7 @@ pub const Camera = struct {
     pixel_delta_v: Vec3,
     samples_per_pixel: u32 = 10,
     max_depth: u32 = 50,
+    background: Vec3,
     vfov: f64 = 90,
     lookfrom: Vec3 = vec3(0, 0, 0), // Point camera is looking from
     lookat: Vec3 = vec3(0, 0, -1), // Point camera is looking at
@@ -56,6 +58,33 @@ pub const Camera = struct {
             .focal_length = focal_length,
             .viewport_height = viewport_height,
             .camera_center = camera_center,
+            .background = undefined,
+            .image_height = undefined,
+            .pixel00_loc = undefined,
+            .pixel_delta_u = undefined,
+            .pixel_delta_v = undefined,
+            .v = undefined,
+            .w = undefined,
+            .u = undefined,
+            .defocus_disk_u = undefined,
+            .defocus_disk_v = undefined,
+        };
+    }
+    pub fn baseCameraInit() Camera {
+        return Camera{
+            .aspect_ratio = 16.0 / 9.0,
+            .image_width = 400,
+            .focal_length = 1.0,
+            .viewport_height = 2.0,
+            .camera_center = vec3(0, 0, 0),
+            .samples_per_pixel = 100,
+            .vfov = 20,
+            .lookfrom = vec3(0, 0, 12),
+            .lookat = vec3(0, 0, 0),
+            .vup = vec3(0, 1, 0),
+            .defocus_angle = 0.0,
+            .focus_dist = 10.0,
+            .background = vec3(0, 0, 0), // Default black background
             .image_height = undefined,
             .pixel00_loc = undefined,
             .pixel_delta_u = undefined,
@@ -95,13 +124,7 @@ pub const Camera = struct {
         self.defocus_disk_v = self.v.scalarMul(defocus_radius);
         self.pixel00_loc = viewport_upper_left.add(self.pixel_delta_u.add(self.pixel_delta_v).scalarMul(0.5));
     }
-    fn renderSection(
-        camera: *Camera,
-        world: BVHNode,
-        start_row: u32,
-        end_row: u32,
-        output: []Vec3,
-    ) void {
+    fn renderSection(camera: *Camera, world: *const BVHNode, start_row: u32, end_row: u32, output: []Vec3, pool: *HitRecordPool) void {
         for (start_row..end_row) |j| {
             for (0..camera.image_width) |i| {
                 var pixel_color = vec3(0, 0, 0);
@@ -109,34 +132,14 @@ pub const Camera = struct {
                 const j_f = @as(f64, @floatFromInt(j));
                 for (0..camera.samples_per_pixel) |_| {
                     const r = camera.getRay(i_f, j_f);
-                    pixel_color = pixel_color.add(rayColor(r, camera.max_depth, world));
+                    pixel_color = pixel_color.add(camera.rayColor(r, camera.max_depth, world, pool));
                 }
                 output[(j - start_row) * camera.image_width + i] = pixel_color;
             }
         }
     }
-    pub fn threadedRender(self: *Self, allocator: *Allocator, world: *BVHNode) !void {
-        self.initialize();
-        const num_threads = try Thread.getCpuCount();
 
-        var threads = try allocator.alloc(Thread, num_threads);
-        defer allocator.free(threads);
-
-        const outputs = try allocator.alloc([]Vec3, num_threads);
-        defer allocator.free(outputs);
-        const threadConfig = Thread.SpawnConfig{
-            .stack_size = 1024 * 16,
-        };
-        for (0..num_threads) |i| {
-            threads[i] = try Thread.spawn(threadConfig, render, .{ self, world, allocator });
-        }
-
-        for (threads) |t| {
-            t.join();
-        }
-    }
-
-    pub fn render(self: *Self, world: *BVHNode, allocator: *Allocator) !void {
+    pub fn render(self: *Self, world: *const BVHNode, allocator: *Allocator) !void {
         self.initialize();
 
         var buffered_writer = std.io.bufferedWriter(std.io.getStdOut().writer());
@@ -149,7 +152,11 @@ pub const Camera = struct {
         defer allocator.free(threads);
 
         const outputs = try allocator.alloc([]Vec3, num_threads);
+
         defer allocator.free(outputs);
+
+        const pools = try allocator.alloc(HitRecordPool, num_threads);
+        defer allocator.free(pools);
 
         const rows_per_thread: u32 = self.image_height / @as(u32, @intCast(num_threads));
         const extra_rows: u32 = self.image_height % @as(u32, @intCast(num_threads));
@@ -160,10 +167,11 @@ pub const Camera = struct {
             const is_last_thread = t == num_threads - 1;
             const actual_rows = rows_per_thread + if (is_last_thread) extra_rows else 0;
             outputs[t] = try allocator.alloc(Vec3, self.image_width * actual_rows);
+            pools[t] = try HitRecordPool.init(allocator, 1024);
         }
 
         const threadConfig = Thread.SpawnConfig{
-            .stack_size = 1024 * 16,
+            .stack_size = 1024 * 128,
         };
 
         // Spawn threads
@@ -171,7 +179,7 @@ pub const Camera = struct {
         for (0..num_threads) |t| {
             const start_row = @as(u32, @intCast(t)) * rows_per_thread;
             const end_row = if (t == num_threads - 1) self.image_height else start_row + rows_per_thread;
-            threads[t] = try Thread.spawn(threadConfig, renderSection, .{ self, world.*, start_row, end_row, outputs[t] });
+            threads[t] = try Thread.spawn(threadConfig, renderSection, .{ self, world, start_row, end_row, outputs[t], &pools[t] });
         }
 
         std.debug.print("", .{});
@@ -203,27 +211,76 @@ pub const Camera = struct {
             allocator.free(outputs[t]);
         }
     }
+    // fn rayColor(self: Self, r: Ray, depth: u32, world: BVHNode) Vec3 {
+    //     if (depth == 0) {
+    //         return vec3(0, 0, 0);
+    //     }
 
-    fn rayColor(r: Ray, depth: u32, world: BVHNode) Vec3 {
+    //     var hit_record: HitRecord = undefined;
+
+    //     if (!world.hit(r, interval(0.001, rtweekend.infinity), &hit_record)) {
+    //         return self.background;
+    //     }
+
+    //     const color_from_emission = hit_record.material.emitted(hit_record.u, hit_record.v, &hit_record.point);
+
+    //     var scattered: Ray = undefined;
+    //     var attenuation: Vec3 = undefined;
+
+    //     if (!hit_record.material.scatter(r, hit_record, &attenuation, &scattered)) {
+    //         return color_from_emission;
+    //     }
+
+    //     const color_from_scatter = attenuation.mul(self.rayColor(scattered, depth - 1, world));
+    //     return color_from_emission.add(color_from_scatter);
+    // }
+    // fn rayColor(self: Self, r: Ray, depth: u32, world: *const BVHNode) Vec3 {
+    //     var current_ray = r;
+    //     var current_depth = depth;
+
+    //     while (current_depth > 0) {
+    //         var hit_record: HitRecord = undefined;
+    //         if (world.hit(current_ray, interval(0.001, rtweekend.infinity), &hit_record)) {
+    //             var scattered: Ray = undefined;
+    //             var attenuation: Vec3 = undefined;
+    //             const color_from_emission = hit_record.material.emitted(hit_record.u, hit_record.v, &hit_record.point);
+    //             if (!hit_record.material.scatter(current_ray, hit_record, &attenuation, &scattered)) {
+    //                 return color_from_emission;
+    //             }
+    //             current_ray = scattered;
+    //             return color_from_emission.add(attenuation.mul(self.rayColor(scattered, depth - 1, world)));
+    //         } else {
+    //             return self.background;
+    //         }
+    //         current_depth -= 1;
+    //     }
+    //     return vec3(0, 0, 0);
+    // }
+    fn rayColor(self: *Self, r: Ray, depth: u32, world: *const BVHNode, pool: *HitRecordPool) Vec3 {
         var current_ray = r;
         var current_depth = depth;
-        var colorVec = vec3(1, 1, 1); // Accumulator for attenuation
-
+        var accumulated_color = vec3(1, 1, 1);
         while (current_depth > 0) {
-            var hit_record: HitRecord = undefined;
-            if (world.hit(current_ray, interval(0.001, rtweekend.infinity), &hit_record)) {
+            var hit_record = pool.get() orelse return self.background; // Check for pool exhaustion
+
+            defer pool.release(hit_record); // Ensure proper cleanup
+
+            if (world.hit(current_ray, interval(0.001, rtweekend.infinity), hit_record)) {
                 var scattered: Ray = undefined;
                 var attenuation: Vec3 = undefined;
-                if (!hit_record.material.scatter(current_ray, hit_record, &attenuation, &scattered)) {
-                    return vec3(0, 0, 0);
+                const color_from_emission = hit_record.material.emitted(hit_record.u, hit_record.v, &hit_record.point);
+
+                if (!hit_record.material.scatter(current_ray, hit_record.*, &attenuation, &scattered)) {
+                    return color_from_emission.mul(accumulated_color); // If no scatter, return emission
                 }
-                colorVec = colorVec.mul(attenuation);
+
+                // Accumulate color over the path
+                accumulated_color = accumulated_color.mul(attenuation).add(color_from_emission);
                 current_ray = scattered;
             } else {
-                const unit_direction = current_ray.direction.unitVector();
-                const a = 0.5 * (unit_direction.y() + 1.0);
-                return colorVec.mul(vec3(1, 1, 1).scalarMul(1.0 - a).add(vec3(0.5, 0.7, 1.0).scalarMul(a)));
+                return self.background.mul(accumulated_color); // Return accumulated light
             }
+
             current_depth -= 1;
         }
         return vec3(0, 0, 0);

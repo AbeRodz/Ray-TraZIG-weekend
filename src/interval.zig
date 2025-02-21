@@ -41,7 +41,7 @@ pub const Interval = struct {
     }
     pub fn expand(self: Self, delta: f64) Self {
         const padding = delta / 2;
-        return Self(self.min - padding, self.max + padding);
+        return .{ .min = self.min - padding, .max = self.max + padding };
     }
 };
 

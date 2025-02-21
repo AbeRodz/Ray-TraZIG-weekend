@@ -12,22 +12,29 @@ pub const aabb = struct {
     const Self = @This();
 
     pub fn init(x: Interval, y: Interval, z: Interval) Self {
-        return Self{ .x = x, .y = y, .z = z };
+        var ab = Self{ .x = x, .y = y, .z = z };
+
+        aabb.padToMinimums(&ab);
+        return ab;
     }
 
     pub fn initByBounds(a: Vec3, b: Vec3) Self {
-        return Self{
+        var ab = Self{
             .x = if (a.x() <= b.x()) interval(a.x(), b.x()) else interval(b.x(), a.x()),
             .y = if (a.y() <= b.y()) interval(a.y(), b.y()) else interval(b.y(), a.y()),
             .z = if (a.z() <= b.z()) interval(a.z(), b.z()) else interval(b.z(), a.z()),
         };
+        aabb.padToMinimums(&ab);
+        return ab;
     }
     pub fn initByBoxes(box0: aabb, box1: aabb) Self {
-        return Self{
+        var ab = Self{
             .x = intervalByBox(box0.x, box1.x),
             .y = intervalByBox(box0.y, box1.y),
             .z = intervalByBox(box0.z, box1.z),
         };
+        aabb.padToMinimums(&ab);
+        return ab;
     }
     pub fn axis_interval(self: Self, n: u8) Interval {
         if (n == 1) return self.y;
@@ -63,6 +70,19 @@ pub const aabb = struct {
             return if (self.x.size() > self.z.size()) 0 else 2;
         }
         return if (self.y.size() > self.z.size()) 1 else 2;
+    }
+
+    fn padToMinimums(self: *Self) void {
+        const delta = 0.0001;
+        if (self.x.size() < delta) {
+            self.x = self.x.expand(delta);
+        }
+        if (self.y.size() < delta) {
+            self.y = self.y.expand(delta);
+        }
+        if (self.z.size() < delta) {
+            self.z = self.z.expand(delta);
+        }
     }
 };
 
